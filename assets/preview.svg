@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1b26"/>
+      <stop offset="1" stop-color="#24283b"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7aa2f7"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+
+  <!-- top bar -->
+  <rect x="0" y="0" width="1600" height="44" fill="#16161e"/>
+  <g font-family="JetBrainsMono NF, monospace" font-size="18" fill="#a9b1d6">
+    <circle cx="34" cy="22" r="6" fill="#7aa2f7"/>
+    <text x="60" y="28">1  2  3</text>
+    <text x="800" y="28" text-anchor="middle">12:00</text>
+    <rect x="1440" y="9" width="56" height="26" rx="6" fill="#7aa2f7"/>
+    <text x="1468" y="28" text-anchor="middle" fill="#16161e" font-weight="bold">EN</text>
+    <text x="1520" y="28">󰕾  󰖩</text>
+  </g>
+
+  <!-- title -->
+  <g font-family="Noto Sans, Liberation Sans, sans-serif" text-anchor="middle">
+    <text x="800" y="122" font-size="52" font-weight="700" fill="#c0caf5">Layout Memory</text>
+    <text x="800" y="170" font-size="26" fill="#9aa5ce">Each app keeps its own keyboard layout. Switch windows, the layout follows.</text>
+  </g>
+
+  <!-- chat window -->
+  <g filter="url(#shadow)">
+    <rect x="110" y="230" width="640" height="560" rx="14" fill="#1f2335" stroke="#3b4261" stroke-width="2"/>
+  </g>
+  <rect x="110" y="230" width="640" height="56" rx="14" fill="#292e42"/>
+  <rect x="110" y="270" width="640" height="16" fill="#292e42"/>
+  <g font-family="Noto Sans, Liberation Sans, sans-serif">
+    <text x="140" y="266" font-size="22" fill="#c0caf5" font-weight="600">Chat</text>
+    <rect x="150" y="320" width="330" height="58" rx="18" fill="#2f3549"/>
+    <text x="172" y="356" font-size="22" fill="#c0caf5">Привет! Как дела?</text>
+    <rect x="390" y="400" width="320" height="58" rx="18" fill="#3d59a1"/>
+    <text x="412" y="436" font-size="22" fill="#e0e6ff">Отлично, скоро буду</text>
+    <rect x="150" y="480" width="270" height="58" rx="18" fill="#2f3549"/>
+    <text x="172" y="516" font-size="22" fill="#c0caf5">Жду в шесть</text>
+    <rect x="140" y="706" width="580" height="56" rx="12" fill="#16161e" stroke="#3b4261"/>
+    <text x="164" y="742" font-size="22" fill="#9aa5ce">Сообщение…</text>
+  </g>
+  <!-- RU badge -->
+  <g font-family="JetBrainsMono NF, monospace">
+    <rect x="620" y="206" width="110" height="54" rx="12" fill="#bb9af7"/>
+    <text x="675" y="243" text-anchor="middle" font-size="28" font-weight="bold" fill="#16161e">RU</text>
+  </g>
+
+  <!-- terminal window -->
+  <g filter="url(#shadow)">
+    <rect x="850" y="230" width="640" height="560" rx="14" fill="#1a1b26" stroke="#7aa2f7" stroke-width="3"/>
+  </g>
+  <rect x="851.5" y="231.5" width="637" height="54" rx="13" fill="#24283b"/>
+  <rect x="851.5" y="270" width="637" height="16" fill="#24283b"/>
+  <g font-family="JetBrainsMono NF, monospace" font-size="21">
+    <text x="880" y="266" fill="#c0caf5" font-weight="600" font-family="Noto Sans, Liberation Sans, sans-serif" font-size="22">Terminal</text>
+    <text x="880" y="336" fill="#9ece6a">~/projects/app</text>
+    <text x="880" y="372" fill="#c0caf5"><tspan fill="#7aa2f7">❯</tspan> git commit -m "Fix login"</text>
+    <text x="880" y="408" fill="#565f89">[main 3f2a1c9] Fix login</text>
+    <text x="880" y="444" fill="#565f89"> 1 file changed, 4 insertions(+)</text>
+    <text x="880" y="496" fill="#9ece6a">~/projects/app</text>
+    <text x="880" y="532" fill="#c0caf5"><tspan fill="#7aa2f7">❯</tspan> make test</text>
+    <text x="880" y="568" fill="#9ece6a">40 passed</text>
+    <text x="880" y="620" fill="#9ece6a">~/projects/app</text>
+    <text x="880" y="656" fill="#c0caf5"><tspan fill="#7aa2f7">❯</tspan> <tspan fill="#c0caf5">▍</tspan></text>
+  </g>
+  <!-- EN badge -->
+  <g font-family="JetBrainsMono NF, monospace">
+    <rect x="1360" y="206" width="110" height="54" rx="12" fill="#7aa2f7"/>
+    <text x="1415" y="243" text-anchor="middle" font-size="28" font-weight="bold" fill="#16161e">EN</text>
+  </g>
+
+  <!-- focus arrows -->
+  <path d="M760 500 C 790 470, 810 470, 840 500" fill="none" stroke="#7aa2f7" stroke-width="4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+
+  <!-- footer -->
+  <text x="800" y="852" text-anchor="middle" font-family="JetBrainsMono NF, monospace" font-size="22" fill="#565f89">remembered per app · saved across restarts · Omarchy shell plugin</text>
+</svg>
