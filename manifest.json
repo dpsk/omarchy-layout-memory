@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.dpsk.layout-memory",
+  "name": "Layout Memory",
+  "version": "0.1.0",
+  "author": "dpsk",
+  "license": "MIT",
+  "description": "Remembers the last keyboard layout used in each application and restores it when you switch windows.",
+  "kinds": ["service"],
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

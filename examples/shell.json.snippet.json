@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "io.github.dpsk.layout-memory",
+      "default": "keep",
+      "rules": {
+        "com.mitchellh.ghostty": "us",
+        "org.telegram.desktop": { "mode": "window" },
+        "steam_app_*": "ignore"
+      },
+      "pauseLayers": ["omarchy-menu", "omarchy-keyboard-panel", "walker"],
+      "focusDelayMs": 80,
+      "debug": false
+    }
+  ]
+}
