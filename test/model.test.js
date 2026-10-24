@@ -257,6 +257,168 @@ test("layers outside the pause list do not pause learning", () => {
   assert.equal(h.state.apps[TELEGRAM].layout, "ru")
 })
 
+// Hyprland's order: an exclusive layer takes keyboard focus without an
+// activewindow event; on close, closelayer comes first, then the refocus.
+function openMenu(h, ns = "omarchy-menu") {
+  h.send({ type: "openlayer", namespace: ns }, 1000)
+  return h.send({ type: "focusTimer" }, 80)
+}
+
+function closeMenu(h, cls, address, ns = "omarchy-menu") {
+  h.send({ type: "closelayer", namespace: ns }, 500)
+  h.send({ type: "activewindow", cls })
+  h.send({ type: "activewindowv2", address })
+  return h.send({ type: "focusTimer" }, 80)
+}
+
+test("a layer with its own layout switches on open and restores the window's on close", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" } })
+  h.focus(TELEGRAM, "a1")
+  h.userSwitch(1)
+  assert.equal(h.state.apps[TELEGRAM].layout, "ru")
+
+  h.clear()
+  h.send({ type: "openlayer", namespace: "omarchy-menu" }, 1000)
+  // Deferred like focus changes, never inside the opening keypress.
+  assert.equal(h.effects("switch").length, 0)
+  assert.equal(h.effects("startFocusTimer").length, 1)
+  h.send({ type: "focusTimer" }, 80)
+  assert.equal(h.effects("switch")[0].index, 0)
+  assert.equal(h.state.current, "us")
+  // The echo of our own switch is not learned.
+  h.send({ type: "activelayout", keyboard: "main-keyboard" }, 10)
+  h.send({ type: "devices", devices: devices({ main: 0, mouse: 0 }) }, 30)
+  assert.equal(h.state.apps[TELEGRAM].layout, "ru")
+
+  // Focus events while the layer is open do not undo its layout.
+  h.clear()
+  h.focus(TELEGRAM, "a1")
+  assert.equal(h.effects("switch").length, 0)
+
+  closeMenu(h, TELEGRAM, "a1")
+  assert.equal(h.effects("switch")[0].index, 1)
+  assert.equal(h.state.current, "ru")
+  assert.equal(h.state.apps[TELEGRAM].layout, "ru")
+})
+
+test("closing a layer with its own layout restores the previous layout for an unknown app", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" } })
+  h.focus(GHOSTTY, "b1")
+  h.userSwitch(1)
+  // Telegram has no memory, so it keeps the current layout.
+  h.focus(TELEGRAM, "a1")
+  assert.equal(h.state.current, "ru")
+  h.clear()
+
+  openMenu(h)
+  assert.equal(h.state.current, "us")
+  closeMenu(h, TELEGRAM, "a1")
+  assert.equal(h.effects("switch")[1].index, 1)
+  assert.equal(h.state.current, "ru")
+  assert.equal(h.state.layerRestore, null)
+})
+
+test("an ignored app gets the layout from before the layer opened", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" }, rules: { [TELEGRAM]: "ignore" } })
+  h.focus(TELEGRAM, "a1")
+  h.userSwitch(1)
+  assert.equal(h.state.apps[TELEGRAM], undefined)
+  openMenu(h)
+  assert.equal(h.state.current, "us")
+  closeMenu(h, TELEGRAM, "a1")
+  assert.equal(h.state.current, "ru")
+})
+
+test("a layer already on its layout does not switch", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" } })
+  h.focus(GHOSTTY, "b1")
+  openMenu(h)
+  closeMenu(h, GHOSTTY, "b1")
+  assert.equal(h.effects("switch").length, 0)
+})
+
+test("a layout changed inside the layer is undone on close", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" } })
+  h.focus(GHOSTTY, "b1")
+  openMenu(h)
+  h.userSwitch(1)
+  assert.equal(h.state.current, "ru")
+  closeMenu(h, GHOSTTY, "b1")
+  assert.equal(h.state.current, "us")
+  assert.equal(h.state.apps[GHOSTTY], undefined)
+})
+
+test("a layer layout that is not configured is skipped", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "dk" } })
+  h.focus(GHOSTTY, "b1")
+  h.userSwitch(1)
+  h.clear()
+  openMenu(h)
+  assert.equal(h.effects("switch").length, 0)
+  assert.equal(h.state.current, "ru")
+})
+
+test("a layer with its own layout pauses learning even outside pauseLayers", () => {
+  const h = harness({ pauseLayers: [], layerLayouts: { "my-launcher": "us" } })
+  h.focus(TELEGRAM, "a1")
+  openMenu(h, "my-launcher")
+  h.userSwitch(1)
+  assert.equal(h.state.apps[TELEGRAM], undefined)
+})
+
+test("a layer that opens before the keyboards are known gets its layout once they are", () => {
+  let state = M.initialState()
+  const effects = []
+  const run = event => {
+    const r = M.step(state, event, 5000)
+    state = r.state
+    effects.push(...r.effects)
+  }
+  run({ type: "config", config: M.parseConfig({ layerLayouts: { "omarchy-menu": "us" } }).config })
+  run({ type: "stateLoaded", apps: {} })
+  run({ type: "activewindow", cls: TELEGRAM, address: "0xa1" })
+  run({ type: "openlayer", namespace: "omarchy-menu" })
+  run({ type: "focusTimer" })
+  assert.equal(effects.filter(e => e.type === "switch").length, 0)
+  run({ type: "devices", devices: devices({ main: 1, mouse: 1 }) })
+  assert.equal(effects.find(e => e.type === "switch").index, 0)
+})
+
+test("a lost closelayer does not keep a layer open forever", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" } })
+  h.focus(TELEGRAM, "a1")
+  h.userSwitch(1)
+  openMenu(h)
+  // The close of this one never arrives.
+  h.tick(10 * 60 * 1000)
+  openMenu(h)
+  closeMenu(h, TELEGRAM, "a1")
+  assert.deepEqual(h.state.layers, {})
+  assert.equal(h.state.current, "ru")
+})
+
+test("closing a layer with its own layout restores even while another launcher is open", () => {
+  const h = harness({ layerLayouts: { "omarchy-menu": "us" } })
+  h.focus(TELEGRAM, "a1")
+  h.userSwitch(1)
+  h.send({ type: "openlayer", namespace: "walker" })
+  openMenu(h)
+  assert.equal(h.state.current, "us")
+  h.clear()
+  h.send({ type: "closelayer", namespace: "omarchy-menu" }, 500)
+  h.send({ type: "focusTimer" }, 80)
+  assert.equal(h.state.current, "ru")
+})
+
+test("parseConfig validates layerLayouts", () => {
+  assert.deepEqual(M.parseConfig({}).config.layerLayouts, {})
+  const { config, warnings } = M.parseConfig({ layerLayouts: { "omarchy-menu": "us", walker: "bad layout!", rofi: 1 } })
+  assert.deepEqual(config.layerLayouts, { "omarchy-menu": "us" })
+  assert.equal(warnings.length, 2)
+  assert.equal(M.parseConfig({ layerLayouts: ["us"] }).warnings.length, 1)
+  assert.equal(M.parseConfig({ layerLayouts: { constructor: "us" } }).config.layerLayouts.constructor, "us")
+})
+
 test("a launcher that never closes stops pausing after a while", () => {
   const h = harness()
   h.focus(TELEGRAM, "a1")

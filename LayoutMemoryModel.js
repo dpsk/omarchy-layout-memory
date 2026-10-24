@@ -38,12 +38,13 @@ var DEFAULT_CONFIG = {
   defaultLayout: "keep",
   rules: [],
   pauseLayers: DEFAULT_PAUSE_LAYERS,
+  layerLayouts: {},
   focusDelayMs: 80,
   debug: false
 }
 
 var LAYOUT_NAME = /^[A-Za-z0-9_-]+(\([A-Za-z0-9_-]+\))?$/
-var KNOWN_CONFIG_KEYS = ["id", "default", "rules", "pauseLayers", "focusDelayMs", "debug"]
+var KNOWN_CONFIG_KEYS = ["id", "default", "rules", "pauseLayers", "layerLayouts", "focusDelayMs", "debug"]
 var RULE_MODES = ["app", "window", "ignore"]
 
 // ------------------------------------------------------------------ parsing
@@ -188,6 +189,7 @@ function parseConfig(entry) {
     defaultLayout: DEFAULT_CONFIG.defaultLayout,
     rules: [],
     pauseLayers: DEFAULT_CONFIG.pauseLayers.slice(),
+    layerLayouts: {},
     focusDelayMs: DEFAULT_CONFIG.focusDelayMs,
     debug: DEFAULT_CONFIG.debug
   }
@@ -218,6 +220,18 @@ function parseConfig(entry) {
       config.pauseLayers = entry.pauseLayers.filter(function (ns) { return typeof ns === "string" && ns })
     } else {
       warnOnce(warnings, "'pauseLayers' must be a list of layer namespaces")
+    }
+  }
+
+  if (entry.layerLayouts !== undefined) {
+    if (entry.layerLayouts && typeof entry.layerLayouts === "object" && !Array.isArray(entry.layerLayouts)) {
+      Object.keys(entry.layerLayouts).forEach(function (ns) {
+        var layout = entry.layerLayouts[ns]
+        if (ns && validLayout(layout)) config.layerLayouts[ns] = layout
+        else warnOnce(warnings, "layerLayouts '" + ns + "': invalid layout, ignored")
+      })
+    } else {
+      warnOnce(warnings, "'layerLayouts' must be an object keyed by layer namespace")
     }
   }
 
@@ -310,6 +324,7 @@ function initialState(config) {
     settleUntil: 0,
     expected: null,
     layers: {},
+    layerRestore: null,
     devicesReady: false,
     stateLoaded: false,
     configLoaded: false,
@@ -348,6 +363,20 @@ function learningPaused(state, now) {
   return false
 }
 
+function layerLayout(state, ns) {
+  var layouts = state.config.layerLayouts
+  return Object.prototype.hasOwnProperty.call(layouts, ns) ? layouts[ns] : null
+}
+
+// The open layer whose layout wins over the focused window's, if any.
+function openLayerWithLayout(state, now) {
+  for (var ns in state.layers) {
+    var layer = state.layers[ns]
+    if (layerLayout(state, ns) && layer.count > 0 && now - layer.since < LAYER_PAUSE_MAX_MS) return ns
+  }
+  return null
+}
+
 function debugLog(state, effects, message) {
   if (state.config.debug) effects.push({ type: "log", message: message })
 }
@@ -371,18 +400,34 @@ function resolveFocus(state, now, effects) {
     return state
   }
   state.resolveWanted = false
-  if (!state.focusClass) return state
 
-  var target = targetLayout(state)
+  // A layer with its own layout keeps it until it closes, whatever focus does.
+  var layer = openLayerWithLayout(state, now)
+  if (layer) return applyLayerLayout(state, layer, now, effects)
+
+  // A layer's own layout must not outlive it: without anything to restore,
+  // go back to the layout from before the layer opened.
+  var restore = state.layerRestore
+  state.layerRestore = null
+  var target = state.focusClass ? targetLayout(state) : null
+  var reason = "focus " + state.focusClass
+  if (!target && restore) {
+    target = restore
+    reason = "layer restore"
+  }
   if (!target) {
-    debugLog(state, effects, "focus " + state.focusClass + ": nothing to restore")
+    if (state.focusClass) debugLog(state, effects, reason + ": nothing to restore")
     return state
   }
   var index = layoutIndex(state.layouts, target)
   if (index === -1) {
-    debugLog(state, effects, "focus " + state.focusClass + ": layout '" + target + "' is not configured")
+    debugLog(state, effects, reason + ": layout '" + target + "' is not configured")
     return state
   }
+  return switchTo(state, index, now, effects, reason)
+}
+
+function switchTo(state, index, now, effects, reason) {
   // Never switch needlessly: a keymap change while a modifier is held is what
   // leaves keys stuck.
   if (state.current === state.layouts[index]) return state
@@ -396,8 +441,20 @@ function resolveFocus(state, now, effects) {
   })
   state.current = state.layouts[index]
   state.expected = { until: now + ECHO_WINDOW_MS }
-  debugLog(state, effects, "focus " + state.focusClass + ": switch to " + state.current)
+  debugLog(state, effects, reason + ": switch to " + state.current)
   return state
+}
+
+// state.current can lag a switch made just before the layer opened, until the
+// next devices reading; the restore then aims at the older layout.
+function applyLayerLayout(state, ns, now, effects) {
+  var layout = layerLayout(state, ns)
+  var index = layoutIndex(state.layouts, layout)
+  if (index === -1) {
+    debugLog(state, effects, "layer " + ns + ": layout '" + layout + "' is not configured")
+    return state
+  }
+  return switchTo(state, index, now, effects, "layer " + ns)
 }
 
 function learn(state, layout, now, effects) {
@@ -547,15 +604,25 @@ function step(previousState, event, now) {
     effects.push({ type: "refreshDevices", delayMs: 30 })
   } else if (type === "openlayer" || type === "closelayer") {
     var ns = String(event.namespace || "")
-    if (state.config.pauseLayers.indexOf(ns) !== -1) {
+    if (state.config.pauseLayers.indexOf(ns) !== -1 || layerLayout(state, ns)) {
       var layer = state.layers[ns] || { count: 0, since: now }
-      var count = type === "openlayer" ? layer.count + 1 : Math.max(0, layer.count - 1)
+      // An expired entry is a close we never saw; do not let it pile up.
+      var previousCount = now - layer.since < LAYER_PAUSE_MAX_MS ? layer.count : 0
+      // Remember the layout from before the first layout layer opened, even
+      // when it already matches: the user may still change it inside.
+      if (type === "openlayer" && layerLayout(state, ns) && !openLayerWithLayout(state, now)) {
+        state.layerRestore = state.current
+      }
+      var count = type === "openlayer" ? previousCount + 1 : Math.max(0, previousCount - 1)
       state.layers = count > 0
         ? withEntry(state.layers, ns, { count: count, since: type === "openlayer" ? now : layer.since })
         : without(state.layers, ns)
+      // Switch through the focus delay, like focus changes do, so the keys
+      // that opened the layer are likely released by then.
+      if (type === "openlayer" && layerLayout(state, ns)) startFocus(state, effects)
       // Whatever was typed in the launcher, the window underneath gets its
       // own layout back.
-      if (type === "closelayer" && !learningPaused(state, now)) startFocus(state, effects)
+      if (type === "closelayer" && (!learningPaused(state, now) || layerLayout(state, ns))) startFocus(state, effects)
     }
   } else if (type === "switchFailed") {
     // The keyboards are not where we assumed; take the next reading as truth.

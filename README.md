@@ -84,6 +84,7 @@ reads that file and picks up changes immediately; it never writes to it.
         "steam_app_*": "ignore"
       },
       "pauseLayers": ["omarchy-menu", "omarchy-keyboard-panel", "walker"],
+      "layerLayouts": { "omarchy-menu": "us" },
       "focusDelayMs": 80,
       "debug": false
     }
@@ -96,6 +97,7 @@ reads that file and picks up changes immediately; it never writes to it.
 | `default` | `"keep"` | Layout for apps with no memory yet. `"keep"` leaves the current layout alone; a layout name such as `"us"` switches to it. |
 | `rules` | `{}` | Per-class overrides, see below. |
 | `pauseLayers` | Omarchy menu, keyboard panel, emoji picker, clipboard and image selector; walker, wofi, rofi, fuzzel, anyrun, tofi | Layer-shell namespaces (launchers, pickers) during which switches are not learned. When one closes, the focused window gets its remembered layout back (if it has one, or `default` is set). Setting this replaces the default list. |
+| `layerLayouts` | `{}` | Layout to switch to while a layer-shell namespace is open, e.g. `{ "omarchy-menu": "us" }` to always type in the Omarchy menu in English. That covers Super+Space, the other `omarchy-menu` menus, and the `omarchy-menu` prompts scripts use (such as a Wi-Fi password). These layers also pause learning. When the layer closes, the focused window gets its layout as usual (rule, memory, or `default`); if that leaves nothing to restore, it goes back to the layout from before the layer opened. To find a launcher's namespace, run `sleep 3; hyprctl layers` and open the launcher. |
 | `focusDelayMs` | `80` | How long focus must settle before restoring. Fast Alt+Tab sweeps resolve once instead of flipping layouts for every window passed. Range 0–1000. |
 | `debug` | `false` | Log every decision to the journal. |
 
